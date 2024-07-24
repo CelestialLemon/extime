@@ -1,23 +1,51 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"time"
 )
 
-func runCommand(args []string) {
+func runCommand(args []string) (error) {
 	cmd := exec.Command("cmd", args...);
 
-	output, err := cmd.CombinedOutput();
+	stdout, err := cmd.StdoutPipe();
 	if err != nil {
-		fmt.Println("ERROR: ", err);
-		return ;
+		return err;
 	}
 
-	fmt.Println("OUTPUT: ", string(output[:]));
-	return;
+	stderr, err := cmd.StderrPipe();
+	if err != nil {
+		return err;
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err;
+	}
+
+	readAndPrint := func(pipe *bufio.Reader) {
+		for {
+			line, err := pipe.ReadString('\n')
+			if err != nil {
+				break
+			}
+			fmt.Print(line);
+		}
+	}
+
+	stdoutReader := bufio.NewReader(stdout);
+	stderrReader := bufio.NewReader(stderr);
+
+	go readAndPrint(stdoutReader);
+	go readAndPrint(stderrReader);
+
+	if err := cmd.Wait(); err != nil {
+		return err;
+	}
+
+	return nil;
 }
 
 func main() {
@@ -30,7 +58,7 @@ func main() {
 	end := time.Now();
 
 	elapsed := end.Sub(start);
-	fmt.Println("Time: ", elapsed.Milliseconds(), "ms");
+	fmt.Println("\nextime: ", elapsed.Milliseconds(), "ms");
 
 	return;
 }
